@@ -35,8 +35,24 @@ export function activate(context: vscode.ExtensionContext) {
 			let fpCodeAction = new vscode.CodeAction('Fingerprint console.log');
 			let fpWorkspaceEdit = new vscode.WorkspaceEdit();
 			
+			let workingRange;
+
+			if (range && range.start.line >= range.end.line && range.start.character !== range.end.character) {
+				// User has selected text
+				// Use the range of text selection
+				workingRange = range
+		} else {
+				// User has not selected text
+				// Compute range to be entire line
+				const line = document.lineAt(range.start.line);
+				const start = new vscode.Position(line.lineNumber, 0)
+				const end = new vscode.Position(line.lineNumber, line.text.length)
+				workingRange = new vscode.Range(start,end);
+		}
+		
+
 			// get new string
-			let oldText = document.getText(range);
+			let oldText = document.getText(workingRange);
 			console.log('text: ', oldText);
 
 			let newText = oldText.replace(/(console.log.+)(\)).*/g, (match, p1, p2) => {
@@ -45,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			console.log('new text: ', newText);
 			
-			fpWorkspaceEdit.replace(document.uri, range, newText);
+			fpWorkspaceEdit.replace(document.uri, workingRange, newText);
 			
 			fpCodeAction.edit = fpWorkspaceEdit;
 
