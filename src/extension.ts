@@ -5,37 +5,37 @@ import { generateString } from './utils';
 
 function fingerPrintWorkspaceEdit(document: vscode.TextDocument, range: vscode.Range) {
 	let fpWorkspaceEdit = new vscode.WorkspaceEdit();
-			
-			let workingRange;
 
-			if (range && range.end.line >= range.start.line && range.start.character !== range.end.character) {
-				// User has selected text
-				// Use the range of text selection
-				workingRange = range;
-		} else {
-				// User has not selected text
-				// Compute range to be entire line
-				const line = document.lineAt(range.start.line);
-				const start = new vscode.Position(line.lineNumber, 0)
-				const end = new vscode.Position(line.lineNumber, line.text.length)
-				workingRange = new vscode.Range(start,end);
-		}
-		
+	let workingRange;
 
-			// get new string
-			let oldText = document.getText(workingRange);
-			console.log('text: ', oldText);
+	if (range && range.end.line >= range.start.line && range.start.character !== range.end.character) {
+		// User has selected text
+		// Use the range of text selection
+		workingRange = range;
+	} else {
+		// User has not selected text
+		// Compute range to be entire line
+		const line = document.lineAt(range.start.line);
+		const start = new vscode.Position(line.lineNumber, 0)
+		const end = new vscode.Position(line.lineNumber, line.text.length)
+		workingRange = new vscode.Range(start, end);
+	}
 
-			console.log('generating new string...');
-			let newText = oldText.replace(/(console.log.+)(\)).*/g, (match, p1, p2) => {
-				return `${p1}, '${generateString()}'${p2}`;
-			} );
 
-			console.log('new text: ', newText);
-			
-			fpWorkspaceEdit.replace(document.uri, workingRange, newText);
+	// get new string
+	let oldText = document.getText(workingRange);
+	console.log('text: ', oldText);
 
-			return fpWorkspaceEdit
+	console.log('generating new string...');
+	let newText = oldText.replace(/(console.log.+)(\)).*/g, (match, p1, p2) => {
+		return `${p1}, '${generateString()}'${p2}`;
+	});
+
+	console.log('new text: ', newText);
+
+	fpWorkspaceEdit.replace(document.uri, workingRange, newText);
+
+	return fpWorkspaceEdit
 }
 
 // This method is called when your extension is activated
@@ -55,36 +55,52 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Hello World from Console.log Fingerprinter from Paradime Labs!');
 	});
 
+	// register code action	
 	let fingerprintConsoleLog = vscode.commands.registerCommand('console-log-fingerprinter.fingerprintConsoleLogs', () => {
 
-		let supportedLangs:vscode.DocumentSelector = [
-			{ "language": "javascript", "scheme": "file" },
-    { "language": "typescript", "scheme": "file" },
-    { "language": "javascriptreact", "scheme": "file" },
-    { "language": "typescriptreact", "scheme": "file" },
-    { "language": "svelte", "scheme": "file" }
-		];
-		
-		let fpActionProvider:vscode.CodeActionProvider = {
-			provideCodeActions(document, range, context) {
+		// execute command
+		const editor = vscode.window.activeTextEditor;
+
+		if (editor) {
+			const document = editor.document
+			const selection = editor.selection
+			const selectedRange = new vscode.Range(selection.start, selection.end);
+
+			const workspaceEdit = fingerPrintWorkspaceEdit(document, selectedRange)
+			vscode.workspace.applyEdit(workspaceEdit);
+		}
+	});
+
+	// register code action
+	let supportedLangs: vscode.DocumentSelector = [
+		{ "language": "javascript", "scheme": "file" },
+		{ "language": "typescript", "scheme": "file" },
+		{ "language": "javascriptreact", "scheme": "file" },
+		{ "language": "typescriptreact", "scheme": "file" },
+		{ "language": "svelte", "scheme": "file" }
+	];
+
+	let fpActionProvider: vscode.CodeActionProvider = {
+		provideCodeActions(document, range, context) {
 			console.log('provide code actions');
 			let fpCodeAction = new vscode.CodeAction('Fingerprint console.log');
-			
+
 			const fpWorkspaceEdit = fingerPrintWorkspaceEdit(document, range)
 
 			fpCodeAction.edit = fpWorkspaceEdit;
 
 			return [fpCodeAction];
-				
-			}
-		};
 
-		vscode.languages.registerCodeActionsProvider(supportedLangs, fpActionProvider );
-	});
+		}
+	};
+
+	vscode.languages.registerCodeActionsProvider(supportedLangs, fpActionProvider);
+
+
 
 	context.subscriptions.push(disposable);
 	context.subscriptions.push(fingerprintConsoleLog);
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() { }
