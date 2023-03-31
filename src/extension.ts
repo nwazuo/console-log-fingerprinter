@@ -3,6 +3,41 @@
 import * as vscode from 'vscode';
 import { generateString } from './utils';
 
+function fingerPrintWorkspaceEdit(document: vscode.TextDocument, range: vscode.Range) {
+	let fpWorkspaceEdit = new vscode.WorkspaceEdit();
+			
+			let workingRange;
+
+			if (range && range.end.line >= range.start.line && range.start.character !== range.end.character) {
+				// User has selected text
+				// Use the range of text selection
+				workingRange = range;
+		} else {
+				// User has not selected text
+				// Compute range to be entire line
+				const line = document.lineAt(range.start.line);
+				const start = new vscode.Position(line.lineNumber, 0)
+				const end = new vscode.Position(line.lineNumber, line.text.length)
+				workingRange = new vscode.Range(start,end);
+		}
+		
+
+			// get new string
+			let oldText = document.getText(workingRange);
+			console.log('text: ', oldText);
+
+			console.log('generating new string...');
+			let newText = oldText.replace(/(console.log.+)(\)).*/g, (match, p1, p2) => {
+				return `${p1}, '${generateString()}'${p2}`;
+			} );
+
+			console.log('new text: ', newText);
+			
+			fpWorkspaceEdit.replace(document.uri, workingRange, newText);
+
+			return fpWorkspaceEdit
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -34,37 +69,9 @@ export function activate(context: vscode.ExtensionContext) {
 			provideCodeActions(document, range, context) {
 			console.log('provide code actions');
 			let fpCodeAction = new vscode.CodeAction('Fingerprint console.log');
-			let fpWorkspaceEdit = new vscode.WorkspaceEdit();
 			
-			let workingRange;
+			const fpWorkspaceEdit = fingerPrintWorkspaceEdit(document, range)
 
-			if (range && range.start.line >= range.end.line && range.start.character !== range.end.character) {
-				// User has selected text
-				// Use the range of text selection
-				workingRange = range
-		} else {
-				// User has not selected text
-				// Compute range to be entire line
-				const line = document.lineAt(range.start.line);
-				const start = new vscode.Position(line.lineNumber, 0)
-				const end = new vscode.Position(line.lineNumber, line.text.length)
-				workingRange = new vscode.Range(start,end);
-		}
-		
-
-			// get new string
-			let oldText = document.getText(workingRange);
-			console.log('text: ', oldText);
-
-			console.log('generating new string...');
-			let newText = oldText.replace(/(console.log.+)(\)).*/g, (match, p1, p2) => {
-				return `${p1}, '${generateString()}'${p2}`;
-			} );
-
-			console.log('new text: ', newText);
-			
-			fpWorkspaceEdit.replace(document.uri, workingRange, newText);
-			
 			fpCodeAction.edit = fpWorkspaceEdit;
 
 			return [fpCodeAction];
